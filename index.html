@@ -748,6 +748,21 @@
   .outlook-card.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
   .outlook-card.weekend { border-color: rgba(255,159,67,.55); }
   .ol-wkd { font-size: 9.5px; letter-spacing: .12em; font-weight: 700; color: var(--warm); background: rgba(255,159,67,.14); border-radius: 5px; padding: 2px 6px; margin-left: 6px; vertical-align: 2px; }
+
+  /* ===== VIEW TABS ===== */
+  .viewnav { position: sticky; top: 0; z-index: 900; display: flex; gap: 8px; padding: 12px 0 14px; margin-bottom: 10px;
+    background: linear-gradient(var(--bg) 78%, transparent); overflow-x: auto; scrollbar-width: none; }
+  .viewnav::-webkit-scrollbar { display: none; }
+  .vn-btn { flex: 0 0 auto; background: var(--card); border: 1px solid var(--border); color: var(--muted);
+    font-family: inherit; font-size: 13.5px; font-weight: 600; padding: 9px 16px; border-radius: 999px;
+    cursor: pointer; transition: all .2s; white-space: nowrap; }
+  .vn-btn:hover { color: var(--text); border-color: var(--accent); }
+  .vn-btn.active { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; border-color: transparent;
+    box-shadow: 0 4px 14px var(--glow); }
+  .view { display: none; }
+  .view.active { display: block; animation: viewIn .25s ease; }
+  @keyframes viewIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .view.active { animation: none; } }
 </style>
 </head>
 <body>
@@ -786,6 +801,16 @@
     <div class="bh-loading">⚓ Sizing up the water…</div>
   </div>
 
+  <!-- VIEW TABS -->
+  <nav class="viewnav" id="viewNav" aria-label="Dashboard sections">
+    <button class="vn-btn active" data-view="today">⛅ Today</button>
+    <button class="vn-btn" data-view="outlook">🗓️ 7 Days</button>
+    <button class="vn-btn" data-view="harbors">⚓ Harbors</button>
+    <button class="vn-btn" data-view="tides">🌊 Tides</button>
+    <button class="vn-btn" data-view="fishing">🎣 Fishing</button>
+  </nav>
+
+  <div class="view active" data-view="today">
   <!-- MAIN GRID: Current / Wind / Pressure -->
   <div class="grid grid-main">
     <!-- CURRENT WEATHER -->
@@ -904,27 +929,38 @@
     </div>
   </div>
 
+  </div>
+
   <!-- 7-DAY FORECAST -->
+  <div class="view" data-view="outlook">
   <div class="section-title">🗓️ 7-Day Boating Outlook <span class="st-line"></span></div>
   <div class="outlook-grid" id="outlookGrid">
     <!-- Filled by JS -->
   </div>
   <div class="fc-note">⚓ Tap any day for the full boater's breakdown — wind hour by hour, tides, seas, storm signals, and all four harbors</div>
   <div class="day-detail" id="dayDetail" hidden></div>
+  </div>
 
   <!-- SURROUNDING AREAS -->
+  <div class="view" data-view="harbors">
   <div class="section-title">⚓ Harbor Boards — Conditions & Bite by Area <span class="st-line"></span></div>
   <div class="harbor-grid" id="areasGrid">
     <!-- Filled by JS -->
   </div>
 
+  </div>
+
   <!-- TIDES — MULTI-LOCATION -->
+  <div class="view" data-view="tides">
   <div class="section-title">🌊 Local Tides <span class="st-line"></span></div>
   <div class="tides-grid" id="tidesGrid">
     <!-- Filled by JS -->
   </div>
 
+  </div>
+
   <!-- FISHING -->
+  <div class="view" data-view="fishing">
   <div class="section-title">🎣 Fishing Conditions <span class="st-line"></span></div>
   <div class="grid grid-bottom">
     <div class="card">
@@ -951,6 +987,7 @@
         <!-- Filled by JS -->
       </div>
     </div>
+  </div>
   </div>
 </div>
 
@@ -1547,12 +1584,6 @@ function renderOutlookCards() {
     const rain = d.precipitation_probability_max[i] ?? 0;
     const fish = dailyFishScore(hi, windMax, rain);
 
-    // Approximate Palm Harbor tides for this day (Sutherland Bayou offsets)
-    const tides = getApproxTides(dt, 35, 0.78);
-    const tideChips = tides.map(t =>
-      `<span class="ol-tide ${t.type === 'low' ? 'lo' : ''}"><b>${t.type === 'high' ? '⬆' : '⬇'}</b> ${t.time}</span>`
-    ).join('');
-
     grid.innerHTML += `
       <div class="outlook-card clickable ${i === 0 ? 'today' : ''} ${isWeekend ? 'weekend' : ''} ${DAYDETAIL.sel === i ? 'sel' : ''}" onclick="showDayDetail(${i})" title="Full boater's breakdown">
         <div class="ol-day"><span class="ol-dow">${dow}${isWeekend ? '<span class="ol-wkd">WEEKEND</span>' : ''}</span><span class="ol-date">${dateStr}</span></div>
@@ -1566,7 +1597,6 @@ function renderOutlookCards() {
         <div class="ol-rows">
           <div class="ol-row"><span class="ol-k">Wind</span><span class="ol-v">${windDir} ${windMax} mph · gusts ${gustMax}</span></div>
           <div class="ol-row"><span class="ol-k">Rain</span><span class="ol-v">${rain}% chance</span></div>
-          <div class="ol-row"><span class="ol-k">Tides</span><span class="ol-v"><span class="ol-tides">${tideChips}</span></span></div>
         </div>
         <div class="ol-fish ${fish.tier}">${fish.label} — ${fish.score}/100<small>${fish.why}</small></div>
       </div>`;
@@ -1792,6 +1822,25 @@ async function loadBoatCall() {
     hero.innerHTML = '<div class="bh-loading">⚓ Couldn\'t size up the water — check connection and refresh.</div>';
   }
 }
+
+// ===== VIEW TABS =====
+(function initViews() {
+  const nav = document.getElementById('viewNav');
+  if (!nav) return;
+  const show = v => {
+    document.querySelectorAll('.view').forEach(s => s.classList.toggle('active', s.dataset.view === v));
+    nav.querySelectorAll('.vn-btn').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+    try { localStorage.setItem('phw-view', v); } catch (e) {}
+  };
+  nav.addEventListener('click', e => {
+    const b = e.target.closest('.vn-btn');
+    if (b) show(b.dataset.view);
+  });
+  let v = 'today';
+  try { v = localStorage.getItem('phw-view') || 'today'; } catch (e) {}
+  if (!nav.querySelector(`[data-view="${v}"]`)) v = 'today';
+  show(v);
+})();
 
 // Radar pane: inline Windy embed in the desktop app (file://); the hosted website
 // blocks cross site frames, so there it becomes a one tap radar launcher instead.
